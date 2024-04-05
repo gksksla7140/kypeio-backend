@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.models import game
@@ -27,7 +27,11 @@ async def create_game(create_request: CreateRequest):
         game_id = generate_game_id()
     game = manager.get_game(game_id)
 
-    return {"message": "Game created", "game_id": game_id}
+    return {
+        "message": "Game created",
+        "game_id": game_id,
+        "host_id": create_request.host_id,
+    }
 
 
 @app.post("/join_game", status_code=status.HTTP_201_CREATED)
@@ -41,11 +45,17 @@ async def join_game(join_request: JoinRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    return {"message": "Player added to game"}
+    return {
+        "message": "Player added to game",
+        "game_id": game_id,
+        "player_id": player_id,
+    }
 
 
-@app.websocket("/ws/{game_id}/{player_id}")
-async def websocket_endpoint(websocket: WebSocket, game_id: str, player_id: str):
+@app.websocket("/game/{game_id}/ws")
+async def websocket_endpoint(
+    websocket: WebSocket, game_id: str, player_id: str = Query(..., min_length=1)
+):
     await websocket.accept()
 
     try:
