@@ -1,4 +1,11 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status, HTTPException, Query
+from fastapi import (
+    FastAPI,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+    HTTPException,
+    Query,
+)
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.models import game
@@ -29,8 +36,10 @@ async def create_game(create_request: CreateRequest):
 
     return {
         "message": "Game created",
-        "game_id": game_id,
-        "host_id": create_request.host_id,
+        "data": {
+            "game_id": game_id,
+            "host_id": create_request.host_id,
+        },
     }
 
 
@@ -47,8 +56,10 @@ async def join_game(join_request: JoinRequest):
 
     return {
         "message": "Player added to game",
-        "game_id": game_id,
-        "player_id": player_id,
+        "data": {
+            "game_id": game_id,
+            "host_id": player_id,
+        },
     }
 
 
