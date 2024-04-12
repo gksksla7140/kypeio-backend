@@ -37,8 +37,8 @@ async def create_game(create_request: CreateRequest):
     return {
         "message": "Game created",
         "data": {
-            "game_id": game_id,
-            "host_id": create_request.host_id,
+            "game_id": game.game_id,
+            "player_id": create_request.host_id,
         },
     }
 
@@ -48,17 +48,28 @@ async def join_game(join_request: JoinRequest):
     game_id = join_request.game_id
     player_id = join_request.player_id
 
-    try:
-        game = manager.get_game(game_id)
-        await game.add_player(Player(player_id))
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    game = manager.get_game(game_id)
+    await game.add_player(Player(player_id))
 
     return {
         "message": "Player added to game",
         "data": {
             "game_id": game_id,
             "host_id": player_id,
+        },
+    }
+
+
+@app.get("/game/{game_id}")
+async def get_game_details(game_id: str):
+    game = manager.get_game(game_id)
+
+    return {
+        "message": "Game details",
+        "data": {
+            "game_id": game.game_id,
+            "host_id": game.host_id,
+            "players": list(game.players.keys()),
         },
     }
 
@@ -77,8 +88,8 @@ async def websocket_endpoint(
 
     try:
         while True:
-            data = await websocket.receive_text()
-            await game.type_character(player_id, data)
+            typedCount = await websocket.receive_text()
+            await game.update_progress()(player_id, typedCount)
     except WebSocketDisconnect:
         game.remove_player(player_id)
         await manager.games[game_id].broadcast_progress()

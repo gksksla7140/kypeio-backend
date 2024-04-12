@@ -7,8 +7,8 @@ class Game:
     def __init__(self, host_id: str, game_id: str):
         self.host_id = host_id
         self.game_id = game_id
-        self.players: Dict[str, Player] = {host_id: Player(host_id)}
-        self.players_progress: Dict[str, str] = {}
+        self.players: Dict[str, Player] = {}
+        self.players_progress: Dict[str, int] = {}
 
     async def add_player(self, player: Player):
         if player.player_id in self.players:
@@ -34,13 +34,11 @@ class Game:
         self.players[player_id].websocket = websocket
         self.broadcast_text(f"Player {player_id} is ready!")
 
-    async def type_character(self, player_id: str, character: str):
+    async def update_progress(self, player_id: str, typedCount: int):
         if player_id not in self.players:
             raise PlayerIdNotExistsError(player_id, self.game_id)
 
-        self.players_progress[player_id] = (
-            self.players_progress.get(player_id, "") + character
-        )
+        self.players_progress[player_id] = typedCount
         await self.broadcast_progress()
 
     async def broadcast_progress(self):
