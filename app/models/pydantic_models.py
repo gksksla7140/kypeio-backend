@@ -6,3 +6,12 @@ class CreateRequest(BaseModel):
 class JoinRequest(BaseModel):
     game_id: str
     player_id: str = Field(..., min_length=1)
+
+class GameDetail(BaseModel):
+    game_id: str
+    host_id: str
+    players: list
+
+class BaseResponse(BaseModel):
+    message: str
+    game_detail: GameDetail
