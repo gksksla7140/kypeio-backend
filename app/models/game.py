@@ -14,7 +14,7 @@ class Game:
         if player.player_id in self.players:
             raise PlayerIdAlreadyExistsError(player.player_id, self.game_id)
         self.players[player.player_id] = player
-        self.players_progress[player.player_id] = ""
+        self.players_progress[player.player_id] = 0
 
         await self.broadcast_progress()
         await self.broadcast_text(f"Player {player.player_id} joined the game")
@@ -31,8 +31,14 @@ class Game:
     async def add_websocket_to_player(self, player_id: str, websocket):
         if player_id not in self.players:
             raise PlayerIdNotExistsError(player_id, self.game_id)
-        self.players[player_id].websocket = websocket
+        self.players[player_id].add_websocket(websocket)
         self.broadcast_text(f"Player {player_id} is ready!")
+
+    async def remove_websocket_from_player(self, player_id: str):
+        if player_id not in self.players:
+            raise PlayerIdNotExistsError(player_id, self.game_id)
+        self.players[player_id].remove_websocket()
+        self.broadcast_text(f"Player {player_id} is disconnected")
 
     async def update_progress(self, player_id: str, typedCount: int):
         if player_id not in self.players:

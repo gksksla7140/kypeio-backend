@@ -63,6 +63,20 @@ async def join_game(join_request: JoinRequest):
     )
 
 
+@app.get("/game/{game_id}")
+async def get_game_details(game_id: str):
+    game = manager.get_game(game_id)
+
+    return BaseResponse(
+        message="Game details",
+        game_detail={
+            "game_id": game.game_id,
+            "host_id": game.host_id,
+            "players": list(game.players.keys()),
+        },
+    )
+
+
 @app.websocket("/game/{game_id}/ws")
 async def websocket_endpoint(
     websocket: WebSocket, game_id: str, player_id: str = Query(..., min_length=1)
@@ -80,5 +94,4 @@ async def websocket_endpoint(
             typedCount = await websocket.receive_text()
             await game.update_progress()(player_id, typedCount)
     except WebSocketDisconnect:
-        game.remove_player(player_id)
-        await manager.games[game_id].broadcast_progress()
+        game.remove_websocket_from_player(player_id)
