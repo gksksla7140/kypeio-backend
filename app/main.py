@@ -1,91 +1,83 @@
-from fastapi import WebSocket, FastAPI, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
-from typing import List
+from fastapi import FastAPI, status
+from fastapi.middleware.cors import CORSMiddleware
+
+from .errors import (
+    GameNotFoundError,
+    PlayerIdAlreadyExistsError,
+)
+from .sockets import sio_app
+
+from .game_manager import manager
+from .models import Player, JoinRequest, CreateRequest, BaseResponse
+from .utils import generate_game_id, get_player_statuses_in_game
 
 app = FastAPI()
+app.mount("/ws", app=sio_app)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
-class Player:
-    def __init__(self, player_id: int, name: str, websocket: WebSocket):
-        self.player_id: int = player_id
-        self.name: str = name
-        self.websocket: WebSocket = websocket
+@app.post(
+    "/create_game", status_code=status.HTTP_201_CREATED, response_model=BaseResponse
+)
+async def create_game(create_request: CreateRequest):
+    game_id = generate_game_id()
+    while manager.create_game(create_request.host_id, game_id) is False:
+        game_id = generate_game_id()
+    game = manager.get_game(game_id)
+    success = game.add_player(Player(create_request.host_id))
+    if not success:
+        raise PlayerIdAlreadyExistsError(create_request.host_id)
+
+    return BaseResponse(
+        message="Game created",
+        game_detail={
+            "game_id": game.game_id,
+            "host_id": game.host_id,
+            "players": get_player_statuses_in_game(game),
+        },
+    )
 
 
-class GameManager:
-    def __init__(self):
-        self.players: List[Player] = []
+@app.post("/join_game", status_code=status.HTTP_201_CREATED)
+async def join_game(join_request: JoinRequest):
+    game_id = join_request.game_id
+    player_id = join_request.player_id
 
-    async def add_player(self, player_id: int, name: str, websocket: WebSocket):
-        await websocket.accept()
-        player = Player(player_id, name, websocket)
-        self.players.append(player)
+    game = manager.get_game(game_id)
 
-    async def remove_player(self, websocket: WebSocket):
-        self.players = [p for p in self.players if p.websocket != websocket]
+    if game is None:
+        raise GameNotFoundError(game_id)
+    success = game.add_player(Player(player_id))
+    if not success:
+        raise PlayerIdAlreadyExistsError(player_id)
 
-    async def send_personal_message(self, player_id: int, message: str):
-        player = next((p for p in self.players if p.player_id == player_id), None)
-        if player:
-            await player.websocket.send_text(message)
-
-    async def broadcast(self, message: str):
-        for player in self.players:
-            await player.websocket.send_text(message)
-
-
-game_manager = GameManager()
-
-@app.get("/")
-async def get():
-    html = """
-    <!DOCTYPE html>
-    <html>
-        <head>
-            <title>Chat</title>
-        </head>
-        <body>
-            <h1>WebSocket Chat</h1>
-            <h2>Your ID: <span id="ws-id"></span></h2>
-            <form action="" onsubmit="sendMessage(event)">
-                <input type="text" id="messageText" autocomplete="off"/>
-                <button>Send</button>
-            </form>
-            <ul id='messages'>
-            </ul>
-            <script>
-                var client_id = Date.now()
-                document.querySelector("#ws-id").textContent = client_id;
-                var ws = new WebSocket(`ws://localhost:8000/ws/${client_id}`);
-                ws.onmessage = function(event) {
-                    var messages = document.getElementById('messages')
-                    var message = document.createElement('li')
-                    var content = document.createTextNode(event.data)
-                    message.appendChild(content)
-                    messages.appendChild(message)
-                };
-                function sendMessage(event) {
-                    var input = document.getElementById("messageText")
-                    ws.send(input.value)
-                    input.value = ''
-                    event.preventDefault()
-                }
-            </script>
-        </body>
-    </html>
-    """
-    return HTMLResponse(content=html, status_code=200)
+    return BaseResponse(
+        message="Player joined",
+        game_detail={
+            "game_id": game.game_id,
+            "host_id": game.host_id,
+            "players": get_player_statuses_in_game(game),
+        },
+    )
 
 
-
-@app.websocket("/ws/{player_id}")
-async def websocket_endpoint(websocket: WebSocket, player_id: int):
-    await game_manager.add_player(player_id, f"Player {player_id}", websocket)
-    try:
-        while True:
-            data = await websocket.receive_text()
-            await game_manager.send_personal_message(player_id, f"You wrote: {data}")
-            await game_manager.broadcast(f"Player {player_id} says: {data}")
-    except WebSocketDisconnect:
-        await game_manager.remove_player(websocket)
-        await game_manager.broadcast(f"Player {player_id} left the game")
+@app.get("/game/{game_id}")
+async def get_game_details(game_id: str):
+    game = manager.get_game(game_id)
+    if game is None:
+        raise GameNotFoundError(game_id)
+    return BaseResponse(
+        message="Game details",
+        game_detail={
+            "game_id": game.game_id,
+            "host_id": game.host_id,
+            "players": get_player_statuses_in_game(game),
+        },
+    )
