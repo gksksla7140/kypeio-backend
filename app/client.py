@@ -36,7 +36,7 @@ async def simulate_progress(client):
         await asyncio.sleep(1)
 
 async def test_socket_io_connection():
-    server_url = "http://localhost:8000"
+    server_url = "http://localhost:8000/ws"
     game_id = "123"
     player_id_1 = "123"
     player_id_2 = "456"

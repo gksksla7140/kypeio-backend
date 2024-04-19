@@ -7,29 +7,34 @@ from .game_manager import manager
 
 class GameNamespace(socketio.AsyncNamespace):
     async def on_connect(self, sid, environ):
+        print(manager.games)
+        print(environ)
         # Extract game ID and player ID from header
         game_id = environ.get("HTTP_GAME_ID")
         player_id = environ.get("HTTP_PLAYER_ID")
-
+        print(game_id)
         if not game_id or not player_id:
             print("Invalid Game ID or Player ID ", "Game ID: ", game_id, "Player ID: ", player_id)
             return False
-
+        print("Game ID: ", game_id, "Player ID: ", player_id)
         # Validate game ID
         game = manager.get_game(game_id)
-        player = game.get_player(player_id)
-        if not player or not game:
-            print("Invalid Player or Game ", "Player: ", player, "Game: ", game)
+        if not game:
+            print("Invalid Game ", "Game: ", game)
             return False
-        
+        player = game.get_player(player_id)
+        if not player:
+            print("Invalid Player ", "Player: ", player)
+            return False
+        print("Attempting to connect player to game")
         if player.is_connected():
             print("Player already connected")
             return False
-        
+
         player.connected()
         await self.save_session(sid, {"game": game, "player": player})
+        print("saving session")
         await self.enter_room(sid, game_id)
-        await self.emit("player_joined", {"player_id": player_id}, room=game_id, skip_sid=sid)
 
         print(f"Socket.IO client {sid} connected to game room {game_id}")
     

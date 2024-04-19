@@ -21,7 +21,7 @@ from .models import Player, JoinRequest, CreateRequest, BaseResponse
 from .utils import generate_game_id, get_player_statuses_in_game
 
 app = FastAPI()
-app.mount("/", app=sio_app)
+app.mount("/ws", app=sio_app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,11 +31,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-game_id = "123"
-manager.create_game("123", game_id)
-game = manager.get_game(game_id)
-game.add_player(Player("123"))
-game.add_player(Player("456"))
 
 
 @app.post(
@@ -46,7 +41,7 @@ async def create_game(create_request: CreateRequest):
     while manager.create_game(create_request.host_id, game_id) is False:
         game_id = generate_game_id()
     game = manager.get_game(game_id)
-    success = await game.add_player(Player(create_request.host_id))
+    success = game.add_player(Player(create_request.host_id))
     if not success:
         raise PlayerIdAlreadyExistsError(create_request.host_id)
 
@@ -69,12 +64,26 @@ async def join_game(join_request: JoinRequest):
 
     if game is None:
         raise GameNotFoundError(game_id)
-    success = await game.add_player(Player(player_id))
+    success = game.add_player(Player(player_id))
     if not success:
         raise PlayerIdAlreadyExistsError(player_id)
 
     return BaseResponse(
         message="Player joined",
+        game_detail={
+            "game_id": game.game_id,
+            "host_id": game.host_id,
+            "players": get_player_statuses_in_game(game),
+        },
+    )
+
+@app.get("/game/{game_id}")
+async def get_game_details(game_id: str):
+    game = manager.get_game(game_id)
+    if game is None:
+        raise GameNotFoundError(game_id)
+    return BaseResponse(
+        message="Game details",
         game_detail={
             "game_id": game.game_id,
             "host_id": game.host_id,
