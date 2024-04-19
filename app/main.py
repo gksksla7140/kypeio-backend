@@ -32,10 +32,10 @@ app.add_middleware(
 )
 
 game_id = "123"
-player_id = "123"
-manager.create_game(player_id, game_id)
+manager.create_game("123", game_id)
 game = manager.get_game(game_id)
-game.add_player(Player(player_id))
+game.add_player(Player("123"))
+game.add_player(Player("456"))
 
 
 @app.post(

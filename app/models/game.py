@@ -3,7 +3,6 @@ from .player import Player
 from typing import Dict
 
 
-
 class Game:
     def __init__(self, host_id: str, game_id: str):
         self.host_id = host_id
@@ -29,6 +28,9 @@ class Game:
         self.players.pop(player_id)
         self.players_progress.pop(player_id)
         return True
+
+    def is_game_empty(self):
+        return len(self.players) == 0
 
     def update_progress(self, player_id: str, typedCount: int) -> bool:
         if player_id not in self.players:

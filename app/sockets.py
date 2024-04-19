@@ -1,4 +1,7 @@
+from re import L
 import socketio
+
+from .models.game import Game, Player
 from .game_manager import manager
 
 
@@ -25,16 +28,32 @@ class GameNamespace(socketio.AsyncNamespace):
         player.connected()
         await self.save_session(sid, {"game": game, "player": player})
         await self.enter_room(sid, game_id)
+        await self.emit("player_joined", {"player_id": player_id}, room=game_id, skip_sid=sid)
 
         print(f"Socket.IO client {sid} connected to game room {game_id}")
+    
 
+    async def on_progress(self, sid, data):
+        session = await self.get_session(sid)
+        game: Game = session["game"]
+        player: Player = session["player"]
+
+        player_progress = int(data.get("progress"))
+        game.update_progress(player.player_id, player_progress)
+        print(f"Player {player.player_id} progress: {player_progress}")
+        await self.emit("progress", {"player_id": player.player_id, "progress": player_progress}, room=game.game_id, skip_sid=sid)
 
     async def on_disconnect(self, sid):
         session = await self.get_session(sid)
-        game = session["game"]
-        player = session["player"]
+        game: Game = session["game"]
+        player:Player = session["player"]
         player.disconnected()
-        print(game, player)
+
+        game.remove_player(player.player_id)
+
+        if game.is_game_empty():
+            manager.remove_game(game.game_id)
+
         print(f"Socket.IO client {sid} disconnected from game room {game.game_id}")
 
 
