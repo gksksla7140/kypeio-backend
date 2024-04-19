@@ -1,14 +1,5 @@
-from fastapi import (
-    FastAPI,
-    WebSocket,
-    WebSocketDisconnect,
-    status,
-    HTTPException,
-    Query,
-)
+from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
-
-from app.models import game, player
 
 from .errors import (
     GameNotFoundError,
@@ -30,7 +21,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 
 @app.post(
@@ -76,6 +66,7 @@ async def join_game(join_request: JoinRequest):
             "players": get_player_statuses_in_game(game),
         },
     )
+
 
 @app.get("/game/{game_id}")
 async def get_game_details(game_id: str):
