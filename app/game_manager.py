@@ -1,7 +1,6 @@
 from typing import Dict
 
 from app.models import Game
-from app.errors import GameNotFoundError
 
 
 class GameManager:
@@ -16,10 +15,15 @@ class GameManager:
 
     def get_game(self, game_id: str) -> Game:
         if game_id not in self.games:
-            raise GameNotFoundError(game_id)
+            return None
         return self.games[game_id]
 
     def remove_game(self, game_id: str) -> None:
         if game_id not in self.games:
-            raise GameNotFoundError(game_id)
+            return False
         self.games.pop(game_id)
+        return True
+
+
+
+manager = GameManager()

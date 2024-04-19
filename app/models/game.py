@@ -1,6 +1,7 @@
+from enum import Enum
 from .player import Player
 from typing import Dict
-from app.errors import PlayerIdAlreadyExistsError, PlayerIdNotExistsError
+
 
 
 class Game:
@@ -10,49 +11,27 @@ class Game:
         self.players: Dict[str, Player] = {}
         self.players_progress: Dict[str, int] = {}
 
-    async def add_player(self, player: Player):
+    def add_player(self, player: Player) -> bool:
         if player.player_id in self.players:
-            raise PlayerIdAlreadyExistsError(player.player_id, self.game_id)
+            return False
         self.players[player.player_id] = player
         self.players_progress[player.player_id] = 0
+        return True
 
-        await self.broadcast_progress()
-        await self.broadcast_text(f"Player {player.player_id} joined the game")
-
-    async def remove_player(self, player_id: str):
+    def get_player(self, player_id: str) -> Player:
         if player_id not in self.players:
-            raise PlayerIdNotExistsError(player_id, self.game_id)
+            return None
+        return self.players[player_id]
+
+    def remove_player(self, player_id: str) -> bool:
+        if player_id not in self.players:
+            return False
         self.players.pop(player_id)
         self.players_progress.pop(player_id)
+        return True
 
-        await self.broadcast_progress()
-        await self.broadcast_text(f"Player {player_id} has left the game")
-
-    async def add_websocket_to_player(self, player_id: str, websocket):
+    def update_progress(self, player_id: str, typedCount: int) -> bool:
         if player_id not in self.players:
-            raise PlayerIdNotExistsError(player_id, self.game_id)
-        self.players[player_id].add_websocket(websocket)
-        self.broadcast_text(f"Player {player_id} is ready!")
-
-    async def remove_websocket_from_player(self, player_id: str):
-        if player_id not in self.players:
-            raise PlayerIdNotExistsError(player_id, self.game_id)
-        self.players[player_id].remove_websocket()
-        self.broadcast_text(f"Player {player_id} is disconnected")
-
-    async def update_progress(self, player_id: str, typedCount: int):
-        if player_id not in self.players:
-            raise PlayerIdNotExistsError(player_id, self.game_id)
-
+            return False
         self.players_progress[player_id] = typedCount
-        await self.broadcast_progress()
-
-    async def broadcast_progress(self):
-        for player in self.players.values():
-            if player.websocket:
-                await player.websocket.send_json(self.players_progress)
-
-    async def broadcast_text(self, message: str):
-        for player in self.players.values():
-            if player.websocket:
-                await player.websocket.send_text(message)
+        return True

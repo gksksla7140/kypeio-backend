@@ -8,11 +8,20 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 
-from .game_manager import GameManager
+from app.models import game, player
+
+from .errors import (
+    GameNotFoundError,
+    PlayerIdAlreadyExistsError,
+)
+from .sockets import sio_app
+
+from .game_manager import manager
 from .models import Player, JoinRequest, CreateRequest, BaseResponse
-from .utils import generate_game_id
+from .utils import generate_game_id, get_player_statuses_in_game
 
 app = FastAPI()
+app.mount("/", app=sio_app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,7 +31,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-manager = GameManager()
+game_id = "123"
+player_id = "123"
+manager.create_game(player_id, game_id)
+game = manager.get_game(game_id)
+game.add_player(Player(player_id))
 
 
 @app.post(
@@ -33,14 +46,16 @@ async def create_game(create_request: CreateRequest):
     while manager.create_game(create_request.host_id, game_id) is False:
         game_id = generate_game_id()
     game = manager.get_game(game_id)
-    await game.add_player(Player(create_request.host_id))
+    success = await game.add_player(Player(create_request.host_id))
+    if not success:
+        raise PlayerIdAlreadyExistsError(create_request.host_id)
 
     return BaseResponse(
         message="Game created",
         game_detail={
             "game_id": game.game_id,
             "host_id": game.host_id,
-            "players": list(game.players.keys()),
+            "players": get_player_statuses_in_game(game),
         },
     )
 
@@ -51,47 +66,18 @@ async def join_game(join_request: JoinRequest):
     player_id = join_request.player_id
 
     game = manager.get_game(game_id)
-    await game.add_player(Player(player_id))
+
+    if game is None:
+        raise GameNotFoundError(game_id)
+    success = await game.add_player(Player(player_id))
+    if not success:
+        raise PlayerIdAlreadyExistsError(player_id)
 
     return BaseResponse(
         message="Player joined",
         game_detail={
             "game_id": game.game_id,
             "host_id": game.host_id,
-            "players": list(game.players.keys()),
+            "players": get_player_statuses_in_game(game),
         },
     )
-
-
-@app.get("/game/{game_id}")
-async def get_game_details(game_id: str):
-    game = manager.get_game(game_id)
-
-    return BaseResponse(
-        message="Game details",
-        game_detail={
-            "game_id": game.game_id,
-            "host_id": game.host_id,
-            "players": list(game.players.keys()),
-        },
-    )
-
-
-@app.websocket("/game/{game_id}/ws")
-async def websocket_endpoint(
-    websocket: WebSocket, game_id: str, player_id: str = Query(..., min_length=1)
-):
-    await websocket.accept()
-
-    try:
-        game = manager.get_game(game_id)
-        game.add_websocket_to_player(player_id, websocket)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    try:
-        while True:
-            typedCount = await websocket.receive_text()
-            await game.update_progress()(player_id, typedCount)
-    except WebSocketDisconnect:
-        game.remove_websocket_from_player(player_id)
