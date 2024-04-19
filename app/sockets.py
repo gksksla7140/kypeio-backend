@@ -12,6 +12,7 @@ class GameNamespace(socketio.AsyncNamespace):
         player_id = environ.get("HTTP_PLAYER_ID")
 
         if not game_id or not player_id:
+            print("Invalid Game ID or Player ID ", "Game ID: ", game_id, "Player ID: ", player_id)
             return False
 
         # Validate game ID
@@ -53,6 +54,7 @@ class GameNamespace(socketio.AsyncNamespace):
 
         if game.is_game_empty():
             manager.remove_game(game.game_id)
+            print(f"Game {game.game_id} removed from game manager")
 
         print(f"Socket.IO client {sid} disconnected from game room {game.game_id}")
 
